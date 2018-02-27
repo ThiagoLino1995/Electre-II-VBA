@@ -1,0 +1,278 @@
+Sub ExDet()
+
+' Declaração de variáveis primárias
+    Dim soma() As Double
+    Dim norm() As Double
+    Dim np() As Double
+    Dim OO() As Integer
+    Dim i As Integer
+    Dim j As Integer
+    Dim k As Integer
+    Dim sp As Double
+    Dim limlin As Integer
+    Dim limcol As Integer
+    Dim crit As Integer
+    Dim alt As Integer
+
+' Atribuição de valor (e dimensão) a Variáveis Primárias
+    ReDim OO(Plan1.Cells(6, 2))
+    ReDim soma(Plan1.Cells(6, 2))
+    ReDim np(Plan1.Cells(6, 2))
+    ReDim norm(Plan1.Cells(9, 2), Plan1.Cells(6, 2))
+    crit = Plan1.Cells(6, 2) - 1
+    alt = Plan1.Cells(9, 2) - 1
+
+' Mapeamento de Layout para atribuição vetorial (Leitura transaladada)
+    limlin = 14 + Plan1.Cells(9, 2).Value
+    limcol = 3 + Plan1.Cells(6, 2).Value
+
+' Gravando as informações em matriz para normatização e vetor soma
+    For j = 4 To limcol
+        For i = 15 To limlin
+            soma(j - 4) = soma(j - 4) + Plan1.Cells(i, j)
+            norm(i - 15, j - 4) = Plan1.Cells(i, j)
+            np(j - 4) = Plan1.Cells(7, j)
+        Next i
+    Next j
+    
+' Variável sp para soma dos pesos
+    sp = Plan1.Cells(7, 2)
+
+' Vetor OO (Ocorrência Ótima) para propriedade de minoração (0) ou majoração (1) futura
+    For i = 4 To limcol
+        If Plan1.Cells(5, i) = "MAIOR" Then
+        OO(i - 4) = 1
+        Else
+        OO(i - 4) = 0
+        End If
+    Next i
+
+' Normalizando Pesos dos Critérios
+    For j = 0 To crit
+        np(j) = np(j) / sp
+    Next j
+
+' Normalizando Critérios
+    For j = 0 To crit
+        For i = 0 To alt
+        norm(i, j) = norm(i, j) / soma(j)
+        Next i
+    Next j
+
+' Método Interativo
+' Criação da Matriz do método ((Alt-1)*(Alt * (Crit+1))
+' Ps.: Foi adicionado uma coluna para indexação das iterações.
+    Dim metodo() As Double
+    Dim interacao() As String
+    fatmet = alt + 1
+    lmetodo = Plan1.Cells(9, 2) * Plan1.Cells(9, 2) - 1
+    cmetodo = Plan1.Cells(6, 2)
+    ReDim metodo(lmetodo, cmetodo)
+    ReDim interacao(lmetodo)
+
+' Comparação de Alternativas considerando Critérios Normalizados
+    For j = 0 To crit
+        For i = 0 To alt
+            For k = 0 To alt
+            interacao(i * fatmet + k) = "(" & (i + 1) & "," & k + 1 & ")"
+                If i = k Then
+                    metodo(i * fatmet + k, j) = 0
+                Else
+                    If OO(j) = 1 Then
+                        If norm(i, j) >= norm(k, j) Then
+                            metodo(i * fatmet + k, j) = np(j)
+                        End If
+                    End If
+                    If OO(j) = 0 Then
+                        If norm(i, j) <= norm(k, j) Then
+                            metodo(i * fatmet + k, j) = np(j)
+                        Else
+                            metodo(i * fatmet + k, j) = 0
+                        End If
+                    End If
+                End If
+            Next k
+        Next i
+    Next j
+
+' Somando Concordâncias e armazenando na Matriz Concordância
+    For i = 0 To lmetodo
+        For j = 0 To crit
+            metodo(i, crit + 1) = metodo(i, crit + 1) + metodo(i, j)
+        Next j
+    Next i
+
+' Determinando parâmetros de Discordância com base nos critérios normalizados
+    Dim dismmf() As Double ' Armazena Maximo em L0, Mínimo em L1 e Dif em L2
+    ReDim dismmf(2, crit) 'Dimensiona ao problema
+    Dim difmax As Double ' Variável para armazenar diferença máxima entre diferenças
+
+    ' Máximo
+    For j = 0 To crit
+        dismmf(0, j) = norm(0, j)
+        For i = 0 To alt
+            If norm(i, j) > dismmf(0, j) Then
+            dismmf(0, j) = norm(i, j)
+            End If
+        Next i
+    Next j
+    
+    ' Mínimo
+    For j = 0 To crit
+        dismmf(1, j) = norm(0, j)
+        For i = 0 To alt
+            If norm(i, j) < dismmf(1, j) Then
+            dismmf(1, j) = norm(i, j)
+            End If
+        Next i
+    Next j
+    
+    ' Diferença
+    For j = 0 To crit
+            dismmf(2, j) = dismmf(0, j) - dismmf(1, j)
+    Next j
+    
+    ' Máxima Diferença
+        difmax = dismmf(2, 0)
+    For i = 0 To crit
+        If difmax < dismmf(2, i) Then
+        difmax = dismmf(2, i)
+        End If
+    Next i
+
+' Gerando Matriz de Discordância
+Dim cmetodo2 As Integer
+cmetodo2 = cmetodo - 1
+Dim metodo2() As Double
+ReDim metodo2(lmetodo, cmetodo2)
+
+    For j = 0 To cmetodo2
+        For i = 0 To alt
+            For k = 0 To alt
+            interacao(i * fatmet + k) = "(" & (i + 1) & "," & k + 1 & ")"
+                If i = k Then
+                    metodo2(i * fatmet + k, j) = 0
+                Else
+                    If OO(j) = 1 Then
+                            metodo2(i * fatmet + k, j) = norm(k, j) - norm(i, j)
+                    End If
+                    If OO(j) = 0 Then
+                            metodo2(i * fatmet + k, j) = -(norm(k, j) - norm(i, j))
+                    End If
+                End If
+            Next k
+        Next i
+    Next j
+
+' Matriz de Máximo/D Discordância
+    Dim mdis() As Double
+    ReDim mdis(lmetodo)
+    
+    For i = 0 To lmetodo
+        mdis(i) = metodo2(i, 0)
+        For j = 0 To crit
+            If metodo2(i, j) > mdis(i) Then
+                mdis(i) = metodo2(i, j)
+            End If
+        Next j
+    Next i
+    For i = 0 To lmetodo
+        mdis(i) = mdis(i) / difmax
+    Next i
+    
+' Matriz de Concordância Final
+    Dim mcor() As Double
+    ReDim mcor(alt, alt)
+    k = 0
+    
+    For i = 0 To alt
+        For j = 0 To alt
+            mcor(i, j) = metodo(i * fatmet + j, crit + 1)
+        Next j
+    Next i
+
+' Matriz de Discordância Final
+    
+    Dim mdisf() As Double
+    ReDim mdisf(alt, alt)
+    For i = 0 To alt
+        For j = o To alt
+            mdisf(i, j) = mdis(i * fatmet + j)
+        Next j
+    Next i
+
+' Declaração Parametros de Concordância e Discordância
+    C1 = 0.8
+    C2 = 0.7
+    C3 = 0.5
+    D1 = 0.95
+    D2 = 0.4
+
+' Geração de Vetor Pontuação
+    Dim rank() As Double
+    ReDim rank(alt)
+    For i = 0 To alt
+        For j = 0 To alt
+            rank(i) = rank(i) + (mcor(i, j) - mdisf(i, j))
+        Next j
+    Next i
+    
+'Aplicação de Quick Sort no Vetor Ranking
+    
+
+' EXIBIÇÃO DE RESULTADOS NA Plan3
+    For i = 0 To alt
+        For j = 0 To crit
+            Plan3.Cells(1, j + 1) = OO(j)
+            Plan3.Cells(2, j + 1) = np(j)
+            Plan3.Cells(i + 3, j + 1) = norm(i, j)
+            Plan3.Cells(alt + 4, j + 1) = soma(j)
+        Next j
+    Next i
+    
+    k = alt + 6 'Translação de Parametro de Exibição
+    
+    For i = 0 To lmetodo
+        For j = 0 To cmetodo
+            Plan3.Cells(i + k, j + 2) = metodo(i, j)
+            Plan3.Cells(i + k, 1) = interacao(i)
+        Next j
+    Next i
+    
+    k = alt + lmetodo + 8 'Translação de Parametro de Exibição
+    
+    For j = 0 To crit
+        For i = 0 To 2
+            Plan3.Cells(i + k, j + 1) = dismmf(i, j)
+            Plan3.Cells(k + 2, crit + 2) = difmax
+            Plan3.Cells(k + 1, crit + 2) = "Dif. max"
+        Next i
+    Next j
+    
+    k = k + 4 ' Translação de Parâmetro de Exibição
+    
+    For i = 0 To lmetodo
+        For j = 0 To cmetodo2
+            Plan3.Cells(i + k, j + 2) = metodo2(i, j)
+            Plan3.Cells(i + k, 1) = interacao(i)
+        Next j
+    Next i
+    
+    k = k + lmetodo + 2 ' Translação de Parâmetro de Exibição
+    
+    For i = 0 To alt
+        For j = 0 To alt
+        Plan3.Cells(i + k, j + 1) = mcor(i, j)
+        Next j
+    Next i
+    
+    k = k + alt + 2
+    j = 2
+    For i = 0 To alt
+            Plan3.Cells(i + k, j) = rank(i)
+    Next i
+
+
+
+End Sub
+
